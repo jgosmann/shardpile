@@ -84,7 +84,16 @@ class HashDb(collections.MutableMapping):
         database do not match. A new entry will be created for files if no hash
         has been stored, yet.'''
         def handle_error(err):
-            pass  # TODO implement error handling
+            import sys
+            msg = [sys.argv[0]]
+            if err.strerror is not None:
+                if err.filename is not None:
+                    msg.append(err.filename)
+                msg.append(err.strerror)
+            else:
+                msg.append("Unknown error.")
+            sys.stderr.write(': '.join(msg))
+            sys.stderr.write('\n')
 
         for dirpath, dirnames, filenames in os.walk(path, onerror=handle_error):
             for filename in filenames:
@@ -104,4 +113,7 @@ if __name__ == '__main__':
 
     with HashDb(args.database[0]) as db:
         for path in args.paths:
-            db.update_tree(path)
+            if os.path.isfile(path):
+                db.update_path(path)
+            else:
+                db.update_tree(path)
