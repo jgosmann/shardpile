@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 import collections
 import gdbm
-#import hashlib
+import hashlib
 import os
 import os.path
+
+
+def sha1sum(path):
+    h = hashlib.sha1()
+    with open(path, 'rb') as f:
+        h.update(f.read(1024 * 1024))
+    return h.hexdigest()
 
 
 class HashDb(collections.MutableMapping):
@@ -24,7 +31,7 @@ class HashDb(collections.MutableMapping):
         def from_path(cls, path):
             modification = os.path.getmtime(path)
             size = os.path.getsize(path)
-            sha1 = 'dummy'  # TODO gen real hash
+            sha1 = sha1sum(path)
             return cls(modification, size, sha1)
 
         def as_raw_string(self):
