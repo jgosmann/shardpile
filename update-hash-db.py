@@ -121,7 +121,7 @@ if __name__ == '__main__':
         help="Hash database to update.")
     args = parser.parse_args()
 
-    with HashDb(args.database[0]) as db:
+    with HashDb(os.path.expanduser(args.database[0])) as db:
         for path in args.paths:
             if os.path.isfile(path):
                 db.update_path(path)
