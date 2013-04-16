@@ -8,25 +8,24 @@ import os.path
 
 class HashDb(collections.MutableMapping):
     class Entry(object):
-        __slots__ = ('path', 'modification', 'size', 'sha1')
+        __slots__ = ('modification', 'size', 'sha1')
 
-        def __init__(self, path, modification, size, sha1):
-            self.path = str(path)
+        def __init__(self, modification, size, sha1):
             self.modification = int(modification)
             self.size = int(size)
             self.sha1 = str(sha1)
 
         @classmethod
-        def from_raw_string(cls, path, raw):
+        def from_raw_string(cls, raw):
             modification, size, sha1 = raw.split(';')
-            return cls(path, modification, size, sha1)
+            return cls(modification, size, sha1)
 
         @classmethod
         def from_path(cls, path):
             modification = os.path.getmtime(path)
             size = os.path.getsize(path)
             sha1 = 'dummy'  # TODO gen real hash
-            return cls(path, modification, size, sha1)
+            return cls(modification, size, sha1)
 
         def as_raw_string(self):
             return ';'.join((str(self.modification), str(self.size), self.sha1))
@@ -41,10 +40,11 @@ class HashDb(collections.MutableMapping):
         self.sync()
 
     def __delitem__(self, path):
-        del self.db[path]
+        del self.db[self.__key_from_path(path)]
 
     def __getitem__(self, path):
-        return HashDb.Entry.from_raw_string(path, self.db[path])
+        key = self.__key_from_path(path)
+        return HashDb.Entry.from_raw_string(self.db[key])
 
     def __iter__(self):
         key = self.db.firstkey()
@@ -56,7 +56,10 @@ class HashDb(collections.MutableMapping):
         return len(self.db)
 
     def __setitem__(self, path, entry):
-        self.db[path] = entry.as_raw_string()
+        self.db[self.__key_from_path(path)] = entry.as_raw_string()
+
+    def __key_from_path(self, path):
+        return os.path.abspath(path)
 
     def reorganize(self):
         self.db.reorganize()
