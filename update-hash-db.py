@@ -8,12 +8,12 @@ import os.path
 
 class HashDb(collections.MutableMapping):
     class Entry(object):
-        __slots__ = ('path', 'modfication', 'size', 'sha1')
+        __slots__ = ('path', 'modification', 'size', 'sha1')
 
         def __init__(self, path, modification, size, sha1):
             self.path = str(path)
             self.modification = int(modification)
-            self.modification = int(size)
+            self.size = int(size)
             self.sha1 = str(sha1)
 
         @classmethod
@@ -29,10 +29,16 @@ class HashDb(collections.MutableMapping):
             return cls(path, modification, size, sha1)
 
         def as_raw_string(self):
-            return ';'.join(str(self.modification), str(self.size), self.sha1)
+            return ';'.join((str(self.modification), str(self.size), self.sha1))
 
     def __init__(self, filename):
         self.db = gdbm.open(filename, 'cf')
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.sync()
 
     def __delitem__(self, path):
         del self.db[path]
@@ -51,9 +57,6 @@ class HashDb(collections.MutableMapping):
 
     def __setitem__(self, path, entry):
         self.db[path] = entry.as_raw_string()
-
-    def close(self):
-        self.sync()
 
     def reorganize(self):
         self.db.reorganize()
@@ -95,7 +98,7 @@ if __name__ == '__main__':
     parser.add_argument(
         'paths', nargs='*', type=str, help="Paths to update hashes for.")
     parser.add_argument(
-        '-d', '--database', nargs=1, type=str, default='~/.hashdb',
+        '-d', '--database', nargs=1, type=str, default=['~/.bck-hashes.db'],
         help="Hash database to update.")
     args = parser.parse_args()
 
