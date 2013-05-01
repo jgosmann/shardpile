@@ -26,6 +26,15 @@ class HashDb(collections.MutableMapping):
             self.size = int(size)
             self.sha1 = str(sha1)
 
+        def __eq__(self, other):
+            if isinstance(other, self.__class__):
+                return self.modification == other.modification and \
+                    self.size == other.size and self.sha1 == other.sha1
+            return False
+
+        def __ne__(self, other):
+            return not self == other
+
         @classmethod
         def from_raw_string(cls, raw):
             modification, size, sha1 = raw.split(';')
@@ -41,8 +50,8 @@ class HashDb(collections.MutableMapping):
         def as_raw_string(self):
             return ';'.join((str(self.modification), str(self.size), self.sha1))
 
-    def __init__(self, filename):
-        self.db = gdbm.open(filename, 'cf')
+    def __init__(self, filename, gdbm_module=gdbm):
+        self.db = gdbm_module.open(filename, 'cf')
 
     def __enter__(self):
         return self
