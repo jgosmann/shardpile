@@ -11,9 +11,9 @@ def sha1sum(path):
     h = hashlib.sha1()
     with open(path, 'rb') as f:
         buf = '1'
-        while buf != '':
-            buf = f.read(1024 * 1024)
-            h.update(buf)
+        #while buf != '':
+        buf = f.read(1024 * 1024)
+        h.update(buf)
     return h.hexdigest()
 
 
@@ -79,7 +79,7 @@ class HashDb(collections.MutableMapping):
         self.db[self.__key_from_path(path)] = entry.as_raw_string()
 
     def __key_from_path(self, path):
-        return os.path.abspath(path)
+        return path
 
     def reorganize(self):
         self.db.reorganize()

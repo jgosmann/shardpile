@@ -22,27 +22,7 @@ class FilesMock(object):
     def __init__(self):
         self.files = {}
         self.dirs = {}
-
-        def getmtime(path):
-            print 'uiaeuiae'
-            try:
-                return self.files[path].mtime
-            except KeyError:
-                raise OSError(errno.ENOENT, os.strerror(errno.ENOENT), path)
-        #self.getmtime = patch('os.path.getmtime', lambda path: getmtime(path))
-
-        def getsize(path):
-            try:
-                return self.files[path].size
-            except KeyError:
-                raise OSError(errno.ENOENT, os.strerror(errno.ENOENT), path)
-        #self.getsize = patch('os.path.getsize', lambda path: getsize(path))
-
         self.path = patch('os.path')
-        self.path.getmtime = MagicMock()
-        self.path.getmtime.side_effect = getmtime
-        self.path.getsize.side_effect = getsize
-
         self.open = patch(
             '__builtin__.open', mock_open(read_data=self.File.content),
             create=True)
@@ -50,6 +30,8 @@ class FilesMock(object):
     def __enter__(self):
         self.open.start()
         self.path.start()
+        os.path.getmtime = MagicMock(side_effect=self.getmtime)
+        os.path.getsize = MagicMock(side_effect=self.getsize)
         return self
 
     def __exit__(self, type, value, traceback):
@@ -61,6 +43,18 @@ class FilesMock(object):
 
     def add_dir(self, path, files):
         self.dirs[path] = files
+
+    def getmtime(self, path):
+        try:
+            return self.files[path].mtime
+        except KeyError:
+            raise OSError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+    def getsize(self, path):
+        try:
+            return self.files[path].size
+        except KeyError:
+            raise OSError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
 
 class HashDbTest(unittest.TestCase):
@@ -79,11 +73,19 @@ class HashDbTest(unittest.TestCase):
         def data_setitem(key, value):
             self.data[key] = value
 
+        def data_nextkey(key):
+            key_iter = iter(self.data)
+            while key_iter.next() != key:
+                pass
+            return key_iter.next()
+
         self.dbmock = MagicMock()
         self.dbmock.__delitem__.side_effect = data_delitem
         self.dbmock.__getitem__.side_effect = data_getitem
         self.dbmock.__setitem__.side_effect = data_setitem
         self.dbmock.__len__.side_effect = lambda: len(self.data)
+        self.dbmock.firstkey.side_effect = lambda: self.data.iterkeys().next()
+        self.dbmock.nextkey.side_effect = data_nextkey
 
         self.gdbm_mock = MagicMock(spec_set=gdbm)
         self.gdbm_mock.open.return_value = self.dbmock
@@ -97,7 +99,7 @@ class HashDbTest(unittest.TestCase):
 
     def test_allows_iteration(self):
         keys = ['0', '1', '2', None]
-        self.dbmock.firstkey.return_value = keys[0]
+        self.dbmock.firstkey.side_effect = lambda: keys[0]
         self.dbmock.nextkey.side_effect = lambda key: keys[keys.index(key) + 1]
 
         for key in self.hashdb:
@@ -121,15 +123,13 @@ class HashDbTest(unittest.TestCase):
             self.data['/newpath'],
             '12345;256;07d307d64e062a0ba2ed725571aecd89f2214232')
 
-    def test_uses_absolute_paths(self):
-        with patch('os.path.abspath') as abspath_mock:
-            abspath_mock.side_effect = lambda path: os.path.join('/cwd', path)
-            entry = HashDb.Entry(
-                1, 2, '07d307d64e062a0ba2ed725571aecd89f2214232')
-            self.hashdb['name'] = entry
-            self.assertIn('/cwd/name', self.data)
-            self.assertEqual(self.hashdb['name'], entry)
-            self.assertEqual(self.hashdb['/cwd/name'], entry)
+    def test_uses_relative_paths(self):
+        entry = HashDb.Entry(
+            1, 2, '07d307d64e062a0ba2ed725571aecd89f2214232')
+        self.hashdb['name'] = entry
+        self.assertIn('name', self.data)
+        self.assertEqual(self.hashdb['name'], entry)
+        self.assertNotIn('/cwd/name', self.data)
 
     def test_allows_deletion_of_entries(self):
         del self.hashdb['/path/to/somefile']
