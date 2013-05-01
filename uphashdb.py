@@ -10,7 +10,10 @@ import os.path
 def sha1sum(path):
     h = hashlib.sha1()
     with open(path, 'rb') as f:
-        h.update(f.read(1024 * 1024))
+        buf = '1'
+        while buf != '':
+            buf = f.read(1024 * 1024)
+            h.update(buf)
     return h.hexdigest()
 
 
