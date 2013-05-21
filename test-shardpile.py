@@ -286,7 +286,39 @@ class HashDbTest(unittest.TestCase):
         self.assertEqual(missing_in_db, ['/path/missingInDb'])
         self.assertEqual(missing_on_disk, ['/path/missingOnDisk'])
 
-    # TODO: Test for error handling
+    def test_verify_tree_prints_walk_errors_and_continues(self):
+        with patch('os.walk') as walk:
+            dirpath = '/dir'
+
+            def test_error_handler(path, onerror):
+                with patch('sys.stderr') as stderr:
+                    buffer = StringIO()
+                    stderr.write = buffer.write
+                    onerror(OSError(
+                        errno.EPERM, 'Permission denied.', 'somedir'))
+                    self.assertEqual(
+                        buffer.getvalue(),
+                        sys.argv[0] + ": somedir: Permission denied.\n")
+                return [(dirpath, [], [])]
+
+            walk.side_effect = test_error_handler
+            self.hashdb.verify_tree(dirpath)
+
+    def test_verify_tree_prints_raised_errors_and_continues(self):
+        with patch('os.walk') as walk:
+            dirpath = '/dir'
+            walk.return_value = [(dirpath, [], ['file'])]
+            with patch('sys.stderr') as stderr:
+                buffer = StringIO()
+                stderr.write = buffer.write
+                with patch('os.path.join') as path_join:
+                    path_join.side_effect = OSError(
+                        errno.EPERM, 'Permission denied.', 'file')
+                    self.hashdb.verify_tree(dirpath)
+
+                self.assertEqual(
+                    buffer.getvalue(),
+                    sys.argv[0] + ": file: Permission denied.\n")
 
 
 class HashDbEntryTest(unittest.TestCase):

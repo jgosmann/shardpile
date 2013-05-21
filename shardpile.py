@@ -104,44 +104,53 @@ class HashDb(collections.MutableMapping):
         if needs_update:
             self[path] = HashDb.Entry.from_path(path)
 
+    @staticmethod
+    def handle_error(err):
+        import sys
+        msg = [sys.argv[0]]
+        if err.strerror is not None:
+            if err.filename is not None:
+                msg.append(err.filename)
+            msg.append(err.strerror)
+        else:
+            msg.append("Unknown error.")
+        sys.stderr.write(': '.join(msg))
+        sys.stderr.write('\n')
+
     def update_tree(self, path):
         '''Updates the hash for all files below `path` in the file system tree.
         A hash is updated if the file size or modification time stored in the
         database do not match. A new entry will be created for files if no hash
         has been stored, yet.'''
-        def handle_error(err):
-            import sys
-            msg = [sys.argv[0]]
-            if err.strerror is not None:
-                if err.filename is not None:
-                    msg.append(err.filename)
-                msg.append(err.strerror)
-            else:
-                msg.append("Unknown error.")
-            sys.stderr.write(': '.join(msg))
-            sys.stderr.write('\n')
-
-        for dirpath, dirnames, filenames in os.walk(path, onerror=handle_error):
+        for dirpath, dirnames, filenames in os.walk(
+                path, onerror=self.handle_error):
             for filename in filenames:
                 try:
                     self.update_path(os.path.join(dirpath, filename))
                 except Exception as e:
-                    handle_error(e)
+                    self.handle_error(e)
 
     def verify_tree(self, path):
         changed = []
         missing_in_db = []
         missing_on_disk = []
         for key, value in self.iteritems():
-            if not os.path.isfile(key):
-                missing_on_disk.append(key)
-            elif value.sha1 != sha1sum(key):
-                changed.append(key)
-        for dirpath, dirnames, filenames in os.walk(path):
+            try:
+                if not os.path.isfile(key):
+                    missing_on_disk.append(key)
+                elif value.sha1 != sha1sum(key):
+                    changed.append(key)
+            except Exception as e:
+                self.handle_error(e)
+        for dirpath, dirnames, filenames in os.walk(
+                path, onerror=self.handle_error):
             for filename in filenames:
-                complete_path = os.path.join(dirpath, filename)
-                if not complete_path in self:
-                    missing_in_db.append(complete_path)
+                try:
+                    complete_path = os.path.join(dirpath, filename)
+                    if not complete_path in self:
+                        missing_in_db.append(complete_path)
+                except Exception as e:
+                    self.handle_error(e)
         return changed, missing_in_db, missing_on_disk
 
 
