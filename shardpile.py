@@ -128,6 +128,22 @@ class HashDb(collections.MutableMapping):
                 except Exception as e:
                     handle_error(e)
 
+    def verify_tree(self, path):
+        changed = []
+        missing_in_db = []
+        missing_on_disk = []
+        for key, value in self.iteritems():
+            if not os.path.isfile(key):
+                missing_on_disk.append(key)
+            elif value.sha1 != sha1sum(key):
+                changed.append(key)
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                complete_path = os.path.join(dirpath, filename)
+                if not complete_path in self:
+                    missing_in_db.append(complete_path)
+        return changed, missing_in_db, missing_on_disk
+
 
 if __name__ == '__main__':
     import argparse

@@ -32,6 +32,8 @@ class FilesMock(object):
         self.path.start()
         os.path.getmtime = MagicMock(side_effect=self.getmtime)
         os.path.getsize = MagicMock(side_effect=self.getsize)
+        os.path.isfile = MagicMock(side_effect=self.isfile)
+        os.path.join = MagicMock(side_effect=self.join)
         return self
 
     def __exit__(self, type, value, traceback):
@@ -63,12 +65,20 @@ class FilesMock(object):
         except KeyError:
             raise OSError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
+    def isfile(self, path):
+        return path in self.files
+
+    def join(self, *args):
+        return '/'.join(args)
+
 
 class HashDbTest(unittest.TestCase):
     def setUp(self):
         self.data = {
             '/path/to/somefile':
-            '1366207797;1024;6cf9224c0ced0affde6832a101676ff656a7cd6f'
+            '1366207797;1024;6cf9224c0ced0affde6832a101676ff656a7cd6f',
+            '/path/to/anotherfile':
+            '1366207797;1024;040f06fd774092478d450774f5ba30c5da78acc8'
         }
 
         def data_delitem(key):
@@ -257,6 +267,26 @@ class HashDbTest(unittest.TestCase):
                 self.assertEqual(
                     buffer.getvalue(),
                     sys.argv[0] + ": file: Permission denied.\n")
+
+    def test_verify_tree(self):
+        self.data['/path/missingOnDisk'] = \
+            '1366207797;1024;040f06fd774092478d450774f5ba30c5da78acc8'
+        with patch('os.walk') as walk:
+            dirpath = '/path'
+            walk.return_value = [
+                (dirpath, ['to'], ['missingInDb']),
+                (os.path.join(dirpath, 'to'), [], ['somefile']),
+                (os.path.join(dirpath, 'to'), [], ['anotherfile'])]
+            with FilesMock() as files:
+                files.add_file('/path/to/somefile', 1, 1)
+                files.add_file('/path/to/anotherfile', 1, 1)
+                changed, missing_in_db, missing_on_disk = \
+                    self.hashdb.verify_tree(dirpath)
+        self.assertEqual(changed, ['/path/to/somefile'])
+        self.assertEqual(missing_in_db, ['/path/missingInDb'])
+        self.assertEqual(missing_on_disk, ['/path/missingOnDisk'])
+
+    # TODO: Test for error handling
 
 
 class HashDbEntryTest(unittest.TestCase):
