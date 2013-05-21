@@ -258,7 +258,28 @@ class HashDbTest(unittest.TestCase):
                     buffer.getvalue(),
                     sys.argv[0] + ": file: Permission denied.\n")
 
-    # TODO test equality of entries
+
+class HashDbEntryTest(unittest.TestCase):
+    def test_equal_entries_considered_equal(self):
+        a = HashDb.Entry(123, 456, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
+        b = HashDb.Entry(123, 456, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
+        self.assertEqual(a, b)
+
+    def test_entries_differing_in_modification_time_are_unequal(self):
+        a = HashDb.Entry(123, 456, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
+        b = HashDb.Entry(23, 456, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
+        self.assertNotEqual(a, b)
+
+    def test_entries_differing_in_size_are_unequal(self):
+        a = HashDb.Entry(123, 456, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
+        b = HashDb.Entry(123, 23, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
+        self.assertNotEqual(a, b)
+
+    def test_entries_differing_in_sha1_are_unequal(self):
+        a = HashDb.Entry(123, 456, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
+        b = HashDb.Entry(123, 456, '07d307d64e062a0ba2ed725571aecd89f2214232')
+        self.assertNotEqual(a, b)
+
 
 if __name__ == '__main__':
     unittest.main()
