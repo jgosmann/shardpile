@@ -6,10 +6,13 @@ import hashlib
 import os
 import os.path
 import unittest
-from mock import MagicMock, mock_open, patch
+import sys
+from mock import call, MagicMock, mock_open, patch
+from StringIO import StringIO
 from uphashdb import HashDb
 
 # FIXME test whole file is read
+
 
 class FilesMock(object):
     class File(object):
@@ -21,7 +24,6 @@ class FilesMock(object):
 
     def __init__(self):
         self.files = {}
-        self.dirs = {}
         self.path = patch('os.path')
         self.open = patch(
             '__builtin__.open', mock_open(read_data=self.File.content),
@@ -40,9 +42,6 @@ class FilesMock(object):
 
     def add_file(self, path, mtime, size):
         self.files[path] = self.File(mtime, size)
-
-    def add_dir(self, path, files):
-        self.dirs[path] = files
 
     def getmtime(self, path):
         try:
@@ -179,22 +178,41 @@ class HashDbTest(unittest.TestCase):
 
         self.assertEqual(cm.exception.errno, errno.ENOENT)
 
-    #def test_can_update_all_paths_in_tree(self):
-        #with FilesMock() as files:
-            #files.add_file('/dir', 1, 1)
-            #files.add_file('/dir/file1', 1, 1)
-            #files.add_file('/dir/file2', 1, 1)
-            #files.add_file('/dir/subdir', 1, 1)
-            #files.add_file('/dir/subdir/file3', 1, 1)
-            #files.add_file('/dir/.hidden_dir', 1, 1)
-            #files.add_file('/dir/.hidden_dir/file4', 1, 1)
-            #files.add_file('/dir/.hidden_file', 1, 1)
+    def test_can_update_all_paths_in_tree(self):
+        with patch('os.walk') as walk:
+            dirpath = '/dir'
+            walk.return_value = [
+                (dirpath, ['a', 'b'], ['file0', 'file1']),
+                (os.path.join(dirpath, 'a'), [], ['file2']),
+                (os.path.join(dirpath, 'b'), [], ['file3', 'file4'])]
+            with patch.object(self.hashdb, 'update_path') as update_path:
+                self.hashdb.update_tree(dirpath)
 
-            #with patch.object(self.hashdb, 'update_path') as update_path:
-                #self.hashdb.update_tree('/dir')
+                expected = [call(os.path.join(dirpath, f)) for f in [
+                    'file0', 'file1', os.path.join('a', 'file2'),
+                    os.path.join('b', 'file3'), os.path.join('b', 'file4')]]
+                self.assertEqual(
+                    len(update_path.call_args_list), len(expected))
+                for c in update_path.call_args_list:
+                    self.assertIn(c, expected)
 
-    #def test_update_all_prints_errors_and_continues(self):
-        #pass
+    def test_update_all_prints_errors_and_continues(self):
+        with patch('os.walk') as walk:
+            dirpath = '/dir'
+
+            def test_error_handler(path, onerror):
+                with patch('sys.stderr') as stderr:
+                    buffer = StringIO()
+                    stderr.write = buffer.write
+                    onerror(OSError(
+                        errno.EPERM, 'Permission denied.', 'somedir'))
+                    self.assertEqual(
+                        buffer.getvalue(),
+                        sys.argv[0] + ": somedir: Permission denied.\n")
+                return [(dirpath, [], [])]
+
+            walk.side_effect = test_error_handler
+            self.hashdb.update_tree(dirpath)
 
     # TODO test equality of entries
 
