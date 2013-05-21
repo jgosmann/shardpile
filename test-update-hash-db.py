@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import __builtin__
 import gdbm
 import errno
 import hashlib
@@ -10,8 +11,6 @@ import sys
 from mock import call, MagicMock, mock_open, patch
 from StringIO import StringIO
 from uphashdb import HashDb
-
-# FIXME test whole file is read
 
 
 class FilesMock(object):
@@ -25,12 +24,11 @@ class FilesMock(object):
     def __init__(self):
         self.files = {}
         self.path = patch('os.path')
-        self.open = patch(
-            '__builtin__.open', mock_open(read_data=self.File.content),
-            create=True)
+        self.open = patch('__builtin__.open', mock_open(), create=True)
 
     def __enter__(self):
         self.open.start()
+        __builtin__.open = MagicMock(side_effect=self.mock_file)
         self.path.start()
         os.path.getmtime = MagicMock(side_effect=self.getmtime)
         os.path.getsize = MagicMock(side_effect=self.getsize)
@@ -42,6 +40,16 @@ class FilesMock(object):
 
     def add_file(self, path, mtime, size):
         self.files[path] = self.File(mtime, size)
+
+    def mock_file(self, filename, mode):
+        def read(size):
+            file_mock.read.side_effect = lambda size: ''
+            return self.File.content
+
+        file_mock = MagicMock()
+        file_mock.__enter__.return_value = file_mock
+        file_mock.read.side_effect = read
+        return file_mock
 
     def getmtime(self, path):
         try:
@@ -141,6 +149,26 @@ class HashDbTest(unittest.TestCase):
 
         expected = HashDb.Entry(
             123, 42, hashlib.sha1(FilesMock.File.content).hexdigest())
+        self.assertEqual(self.hashdb['/newfile'], expected)
+
+    def test_reads_complete_file(self):
+        with FilesMock() as files:
+            with patch('__builtin__.open', mock_open()) as open_patch:
+                chunks = ['con', 'tent', '']
+
+                def read_chunk(size):
+                    return chunks.pop(0)
+
+                file_mock = MagicMock()
+                file_mock.__enter__.return_value = file_mock
+                file_mock.read.side_effect = read_chunk
+                open_patch.return_value = file_mock
+
+                files.add_file('/newfile', 123, 42)
+                self.hashdb.update_path('/newfile')
+
+        expected = HashDb.Entry(
+            123, 42, hashlib.sha1('content').hexdigest())
         self.assertEqual(self.hashdb['/newfile'], expected)
 
     def test_updates_hash_if_modification_time_changed(self):

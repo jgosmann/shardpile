@@ -11,9 +11,9 @@ def sha1sum(path):
     h = hashlib.sha1()
     with open(path, 'rb') as f:
         buf = '1'
-        #while buf != '':
-        buf = f.read(1024 * 1024)
-        h.update(buf)
+        while buf != '':
+            buf = f.read(1024 * 1024)
+            h.update(buf)
     return h.hexdigest()
 
 
@@ -49,6 +49,9 @@ class HashDb(collections.MutableMapping):
 
         def as_raw_string(self):
             return ';'.join((str(self.modification), str(self.size), self.sha1))
+
+        def __repr__(self):
+            return self.as_raw_string()
 
     def __init__(self, filename, gdbm_module=gdbm):
         self.db = gdbm_module.open(filename, 'cf')
