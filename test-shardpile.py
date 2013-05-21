@@ -10,7 +10,7 @@ import unittest
 import sys
 from mock import call, MagicMock, mock_open, patch
 from StringIO import StringIO
-from uphashdb import HashDb
+from shardpile import HashDb
 
 
 class FilesMock(object):
