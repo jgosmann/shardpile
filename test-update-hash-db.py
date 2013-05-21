@@ -196,7 +196,7 @@ class HashDbTest(unittest.TestCase):
                 for c in update_path.call_args_list:
                     self.assertIn(c, expected)
 
-    def test_update_all_prints_errors_and_continues(self):
+    def test_update_all_prints_walk_errors_and_continues(self):
         with patch('os.walk') as walk:
             dirpath = '/dir'
 
@@ -213,6 +213,22 @@ class HashDbTest(unittest.TestCase):
 
             walk.side_effect = test_error_handler
             self.hashdb.update_tree(dirpath)
+
+    def test_update_all_prints_update_path_errors_and_continues(self):
+        with patch('os.walk') as walk:
+            dirpath = '/dir'
+            walk.return_value = [(dirpath, [], ['file'])]
+            with patch('sys.stderr') as stderr:
+                buffer = StringIO()
+                stderr.write = buffer.write
+                with patch.object(self.hashdb, 'update_path') as update_path:
+                    update_path.side_effect = OSError(
+                        errno.EPERM, 'Permission denied.', 'file')
+                    self.hashdb.update_tree(dirpath)
+
+                self.assertEqual(
+                    buffer.getvalue(),
+                    sys.argv[0] + ": file: Permission denied.\n")
 
     # TODO test equality of entries
 

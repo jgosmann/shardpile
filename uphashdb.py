@@ -120,7 +120,10 @@ class HashDb(collections.MutableMapping):
 
         for dirpath, dirnames, filenames in os.walk(path, onerror=handle_error):
             for filename in filenames:
-                self.update_path(os.path.join(dirpath, filename))
+                try:
+                    self.update_path(os.path.join(dirpath, filename))
+                except Exception as e:
+                    handle_error(e)
 
 
 if __name__ == '__main__':
