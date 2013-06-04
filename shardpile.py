@@ -166,7 +166,7 @@ if __name__ == '__main__':
         "tree in the file system and allows to verify trees against this " +
         "hash database.")
     parser.add_argument(
-        'path', nargs='1', type=str, help="Path to update hashes for.")
+        'path', nargs=1, type=str, help="Path to update hashes for.")
     parser.add_argument(
         '-d', '--database', nargs=1, type=str, default=['~/.shardpile.db'],
         help="Hash database to update.")
