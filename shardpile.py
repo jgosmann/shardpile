@@ -157,17 +157,25 @@ class HashDb(collections.MutableMapping):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
-        description="Update database of hashes.")
+        description="Shardpile maintains a database of SHA1 hashes of a " +
+        "tree in the file system and allows to verify trees against this " +
+        "hash database.")
     parser.add_argument(
-        'paths', nargs='*', type=str, help="Paths to update hashes for.")
+        'path', nargs='1', type=str, help="Path to update hashes for.")
     parser.add_argument(
         '-d', '--database', nargs=1, type=str, default=['~/.bck-hashes.db'],
         help="Hash database to update.")
+    parser.add_argument(
+        '-u', '--update', action='store_true',
+        help="Update the database instead of performing verification.")
     args = parser.parse_args()
 
     with HashDb(os.path.expanduser(args.database[0])) as db:
-        for path in args.paths:
+        path = args.path[0]
+        if args.update:
             if os.path.isfile(path):
                 db.update_path(path)
             else:
                 db.update_tree(path)
+        else:
+            db.verify_tree(path)
