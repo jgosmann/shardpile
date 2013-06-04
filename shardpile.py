@@ -130,6 +130,11 @@ class HashDb(collections.MutableMapping):
                 except Exception as e:
                     self.handle_error(e)
 
+    def strip(self):
+        for key in self.iterkeys():
+            if not os.path.exists(key):
+                del self[key]
+
     def verify_tree(self, path):
         changed = []
         missing_in_db = []
@@ -168,11 +173,17 @@ if __name__ == '__main__':
     parser.add_argument(
         '-u', '--update', action='store_true',
         help="Update the database instead of performing verification.")
+    parser.add_argument(
+        '--no-strip', action='store_true',
+        help="Do not strip hashes of deleted files from the database during " +
+        "update.")
     args = parser.parse_args()
 
     with HashDb(os.path.expanduser(args.database[0])) as db:
         path = args.path[0]
         if args.update:
+            if not args.no_strip:
+                db.strip()
             if os.path.isfile(path):
                 db.update_path(path)
             else:

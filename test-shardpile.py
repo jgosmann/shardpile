@@ -30,6 +30,7 @@ class FilesMock(object):
         self.open.start()
         __builtin__.open = MagicMock(side_effect=self.mock_file)
         self.path.start()
+        os.path.exists = MagicMock(side_effect=self.exists)
         os.path.getmtime = MagicMock(side_effect=self.getmtime)
         os.path.getsize = MagicMock(side_effect=self.getsize)
         os.path.isfile = MagicMock(side_effect=self.isfile)
@@ -52,6 +53,9 @@ class FilesMock(object):
         file_mock.__enter__.return_value = file_mock
         file_mock.read.side_effect = read
         return file_mock
+
+    def exists(self, path):
+        return path in self.files
 
     def getmtime(self, path):
         try:
@@ -267,6 +271,13 @@ class HashDbTest(unittest.TestCase):
                 self.assertEqual(
                     buffer.getvalue(),
                     sys.argv[0] + ": file: Permission denied.\n")
+
+    def test_strip_deletes_hashes_for_nonexistent_files(self):
+        with FilesMock() as files:
+            files.add_file('/path/to/somefile', 123, 1024)
+            self.hashdb.strip()
+        self.assertIn('/path/to/somefile', self.hashdb)
+        self.assertNotIn('/path/to/anotherfile', self.hashdb)
 
     def test_verify_tree(self):
         self.data['/path/missingOnDisk'] = \
