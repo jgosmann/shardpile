@@ -163,7 +163,7 @@ if __name__ == '__main__':
     parser.add_argument(
         'path', nargs='1', type=str, help="Path to update hashes for.")
     parser.add_argument(
-        '-d', '--database', nargs=1, type=str, default=['~/.bck-hashes.db'],
+        '-d', '--database', nargs=1, type=str, default=['~/.shardpile.db'],
         help="Hash database to update.")
     parser.add_argument(
         '-u', '--update', action='store_true',
