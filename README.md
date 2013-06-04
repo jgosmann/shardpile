@@ -34,6 +34,8 @@ Requirements
 * [Python 2.7](http://www.python.org/)
 * [gdbm module](http://docs.python.org/2/library/gdbm.html)
 
+For the unit tests, additionally:
+* [mock](http://www.voidspace.org.uk/python/mock/)
 
 Installation
 ============
