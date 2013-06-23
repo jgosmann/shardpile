@@ -48,7 +48,8 @@ class HashDb(collections.MutableMapping):
             return cls(modification, size, sha1)
 
         def as_raw_string(self):
-            return ';'.join((str(self.modification), str(self.size), self.sha1))
+            return ';'.join(
+                (str(self.modification), str(self.size), self.sha1))
 
         def __repr__(self):
             return self.as_raw_string()
@@ -90,19 +91,20 @@ class HashDb(collections.MutableMapping):
     def sync(self):
         self.db.sync()
 
-    def update_path(self, path):
+    def update_path(self, dirpath, key):
         '''Updates the hash for `path` if the file size or modification time
         changed. If no hash for `path` has been stored so far an corresponding
         entry will be created.'''
-        exists = path in self
+        path = os.path.join(dirpath, key)
+        exists = key in self
         if exists:
             needs_update = \
-                self[path].modification != int(os.path.getmtime(path)) or \
-                self[path].size != os.path.getsize(path)
+                self[key].modification != int(os.path.getmtime(path)) or \
+                self[key].size != os.path.getsize(path)
         else:
             needs_update = True
         if needs_update:
-            self[path] = HashDb.Entry.from_path(path)
+            self[key] = HashDb.Entry.from_path(path)
 
     @staticmethod
     def handle_error(err):
@@ -126,7 +128,9 @@ class HashDb(collections.MutableMapping):
                 path, onerror=self.handle_error):
             for filename in filenames:
                 try:
-                    self.update_path(os.path.join(dirpath, filename))
+                    self.update_path(
+                        path,
+                        os.path.relpath(os.path.join(dirpath, filename), path))
                 except Exception as e:
                     self.handle_error(e)
 
@@ -192,12 +196,12 @@ if __name__ == '__main__':
             changed, missing_in_db, missing_on_disk = db.verify_tree(path)
             print('Changed:')
             for name in changed:
-                  print(name)
+                print(name)
             print('')
             print('Missing in DB:')
             for name in missing_in_db:
-                  print(name)
+                print(name)
             print('')
             print('Missing on disk:')
             for name in missing_on_disk:
-                  print(name)
+                print(name)

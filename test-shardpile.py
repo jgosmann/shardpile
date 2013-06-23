@@ -114,9 +114,9 @@ class HashDbTest(unittest.TestCase):
 
     def test_can_be_used_in_with(self):
         with FilesMock() as files:
-            files.add_file('path/to/somefile', 1366207797, 1024)
+            files.add_file('./path/to/somefile', 1366207797, 1024)
             with HashDb('<filename>', self.gdbm_mock) as db:
-                db.update_path('path/to/somefile')
+                db.update_path('.', 'path/to/somefile')
 
     def test_allows_iteration(self):
         keys = ['0', '1', '2', None]
@@ -145,22 +145,14 @@ class HashDbTest(unittest.TestCase):
             self.data['newpath'],
             '12345;256;07d307d64e062a0ba2ed725571aecd89f2214232')
 
-    def test_uses_relative_paths(self):
-        entry = HashDb.Entry(
-            1, 2, '07d307d64e062a0ba2ed725571aecd89f2214232')
-        self.hashdb['name'] = entry
-        self.assertIn('name', self.data)
-        self.assertEqual(self.hashdb['name'], entry)
-        self.assertNotIn('cwd/name', self.data)
-
     def test_allows_deletion_of_entries(self):
         del self.hashdb['path/to/somefile']
         self.assertFalse('path/to/somefile' in self.hashdb)
 
     def test_inserts_hash_for_new_file(self):
         with FilesMock() as files:
-            files.add_file('newfile', 123, 42)
-            self.hashdb.update_path('newfile')
+            files.add_file('./newfile', 123, 42)
+            self.hashdb.update_path('.', 'newfile')
 
         expected = HashDb.Entry(
             123, 42, hashlib.sha1(FilesMock.File.content).hexdigest())
@@ -179,8 +171,8 @@ class HashDbTest(unittest.TestCase):
                 file_mock.read.side_effect = read_chunk
                 open_patch.return_value = file_mock
 
-                files.add_file('newfile', 123, 42)
-                self.hashdb.update_path('newfile')
+                files.add_file('./newfile', 123, 42)
+                self.hashdb.update_path('.', 'newfile')
 
         expected = HashDb.Entry(
             123, 42, hashlib.sha1('content').hexdigest())
@@ -188,8 +180,8 @@ class HashDbTest(unittest.TestCase):
 
     def test_updates_hash_if_modification_time_changed(self):
         with FilesMock() as files:
-            files.add_file('path/to/somefile', 123, 1024)
-            self.hashdb.update_path('path/to/somefile')
+            files.add_file('./path/to/somefile', 123, 1024)
+            self.hashdb.update_path('.', 'path/to/somefile')
 
         expected = HashDb.Entry(
             123, 1024, hashlib.sha1(FilesMock.File.content).hexdigest())
@@ -197,17 +189,26 @@ class HashDbTest(unittest.TestCase):
 
     def test_updates_hash_if_size_changed(self):
         with FilesMock() as files:
-            files.add_file('path/to/somefile', 1366207797, 42)
-            self.hashdb.update_path('path/to/somefile')
+            files.add_file('./path/to/somefile', 1366207797, 42)
+            self.hashdb.update_path('.', 'path/to/somefile')
 
         expected = HashDb.Entry(
             1366207797, 42, hashlib.sha1(FilesMock.File.content).hexdigest())
         self.assertEqual(self.hashdb['path/to/somefile'], expected)
 
+    def test_update_uses_relative_path(self):
+        with FilesMock() as files:
+            files.add_file('path/to/somefile', 1366207797, 42)
+            self.hashdb.update_path('path', 'to/somefile')
+
+        expected = HashDb.Entry(
+            1366207797, 42, hashlib.sha1(FilesMock.File.content).hexdigest())
+        self.assertEqual(self.hashdb['to/somefile'], expected)
+
     def test_does_not_update_hash_if_modification_and_size_unchanged(self):
         with FilesMock() as files:
-            files.add_file('path/to/somefile', 1366207797, 1024)
-            self.hashdb.update_path('path/to/somefile')
+            files.add_file('./path/to/somefile', 1366207797, 1024)
+            self.hashdb.update_path('.', 'path/to/somefile')
 
         expected = HashDb.Entry(
             1366207797, 1024, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
@@ -215,9 +216,9 @@ class HashDbTest(unittest.TestCase):
 
     def test_update_path_throws_exception_for_non_existing_files(self):
         with FilesMock() as files:
-            files.add_file('existent', 1, 1)
+            files.add_file('./existent', 1, 1)
             with self.assertRaises(OSError) as cm:
-                self.hashdb.update_path('nonexistent')
+                self.hashdb.update_path('.', 'nonexistent')
 
         self.assertEqual(cm.exception.errno, errno.ENOENT)
 
@@ -231,7 +232,7 @@ class HashDbTest(unittest.TestCase):
             with patch.object(self.hashdb, 'update_path') as update_path:
                 self.hashdb.update_tree(dirpath)
 
-                expected = [call(os.path.join(dirpath, f)) for f in [
+                expected = [call(dirpath, f) for f in [
                     'file0', 'file1', os.path.join('a', 'file2'),
                     os.path.join('b', 'file3'), os.path.join('b', 'file4')]]
                 self.assertEqual(
