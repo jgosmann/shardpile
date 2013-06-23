@@ -79,9 +79,9 @@ class FilesMock(object):
 class HashDbTest(unittest.TestCase):
     def setUp(self):
         self.data = {
-            '/path/to/somefile':
+            'path/to/somefile':
             '1366207797;1024;6cf9224c0ced0affde6832a101676ff656a7cd6f',
-            '/path/to/anotherfile':
+            'path/to/anotherfile':
             '1366207797;1024;040f06fd774092478d450774f5ba30c5da78acc8'
         }
 
@@ -114,9 +114,9 @@ class HashDbTest(unittest.TestCase):
 
     def test_can_be_used_in_with(self):
         with FilesMock() as files:
-            files.add_file('/path/to/somefile', 1366207797, 1024)
+            files.add_file('path/to/somefile', 1366207797, 1024)
             with HashDb('<filename>', self.gdbm_mock) as db:
-                db.update_path('/path/to/somefile')
+                db.update_path('path/to/somefile')
 
     def test_allows_iteration(self):
         keys = ['0', '1', '2', None]
@@ -130,18 +130,19 @@ class HashDbTest(unittest.TestCase):
         self.assertEqual(len(self.hashdb), len(self.data))
 
     def test_provides_dictionary_interface(self):
-        entry = self.hashdb['/path/to/somefile']
+        entry = self.hashdb['path/to/somefile']
         self.assertEqual(entry.modification, 1366207797)
         self.assertEqual(entry.size, 1024)
-        self.assertEqual(entry.sha1, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
+        self.assertEqual(
+            entry.sha1, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
 
         with self.assertRaises(KeyError):
-            entry = self.hashdb['/newpath']
+            entry = self.hashdb['newpath']
 
-        self.hashdb['/newpath'] = HashDb.Entry(
+        self.hashdb['newpath'] = HashDb.Entry(
             12345, 256, '07d307d64e062a0ba2ed725571aecd89f2214232')
         self.assertEqual(
-            self.data['/newpath'],
+            self.data['newpath'],
             '12345;256;07d307d64e062a0ba2ed725571aecd89f2214232')
 
     def test_uses_relative_paths(self):
@@ -150,20 +151,20 @@ class HashDbTest(unittest.TestCase):
         self.hashdb['name'] = entry
         self.assertIn('name', self.data)
         self.assertEqual(self.hashdb['name'], entry)
-        self.assertNotIn('/cwd/name', self.data)
+        self.assertNotIn('cwd/name', self.data)
 
     def test_allows_deletion_of_entries(self):
-        del self.hashdb['/path/to/somefile']
-        self.assertFalse('/path/to/somefile' in self.hashdb)
+        del self.hashdb['path/to/somefile']
+        self.assertFalse('path/to/somefile' in self.hashdb)
 
     def test_inserts_hash_for_new_file(self):
         with FilesMock() as files:
-            files.add_file('/newfile', 123, 42)
-            self.hashdb.update_path('/newfile')
+            files.add_file('newfile', 123, 42)
+            self.hashdb.update_path('newfile')
 
         expected = HashDb.Entry(
             123, 42, hashlib.sha1(FilesMock.File.content).hexdigest())
-        self.assertEqual(self.hashdb['/newfile'], expected)
+        self.assertEqual(self.hashdb['newfile'], expected)
 
     def test_reads_complete_file(self):
         with FilesMock() as files:
@@ -178,51 +179,51 @@ class HashDbTest(unittest.TestCase):
                 file_mock.read.side_effect = read_chunk
                 open_patch.return_value = file_mock
 
-                files.add_file('/newfile', 123, 42)
-                self.hashdb.update_path('/newfile')
+                files.add_file('newfile', 123, 42)
+                self.hashdb.update_path('newfile')
 
         expected = HashDb.Entry(
             123, 42, hashlib.sha1('content').hexdigest())
-        self.assertEqual(self.hashdb['/newfile'], expected)
+        self.assertEqual(self.hashdb['newfile'], expected)
 
     def test_updates_hash_if_modification_time_changed(self):
         with FilesMock() as files:
-            files.add_file('/path/to/somefile', 123, 1024)
-            self.hashdb.update_path('/path/to/somefile')
+            files.add_file('path/to/somefile', 123, 1024)
+            self.hashdb.update_path('path/to/somefile')
 
         expected = HashDb.Entry(
             123, 1024, hashlib.sha1(FilesMock.File.content).hexdigest())
-        self.assertEqual(self.hashdb['/path/to/somefile'], expected)
+        self.assertEqual(self.hashdb['path/to/somefile'], expected)
 
     def test_updates_hash_if_size_changed(self):
         with FilesMock() as files:
-            files.add_file('/path/to/somefile', 1366207797, 42)
-            self.hashdb.update_path('/path/to/somefile')
+            files.add_file('path/to/somefile', 1366207797, 42)
+            self.hashdb.update_path('path/to/somefile')
 
         expected = HashDb.Entry(
             1366207797, 42, hashlib.sha1(FilesMock.File.content).hexdigest())
-        self.assertEqual(self.hashdb['/path/to/somefile'], expected)
+        self.assertEqual(self.hashdb['path/to/somefile'], expected)
 
     def test_does_not_update_hash_if_modification_and_size_unchanged(self):
         with FilesMock() as files:
-            files.add_file('/path/to/somefile', 1366207797, 1024)
-            self.hashdb.update_path('/path/to/somefile')
+            files.add_file('path/to/somefile', 1366207797, 1024)
+            self.hashdb.update_path('path/to/somefile')
 
         expected = HashDb.Entry(
             1366207797, 1024, '6cf9224c0ced0affde6832a101676ff656a7cd6f')
-        self.assertEqual(self.hashdb['/path/to/somefile'], expected)
+        self.assertEqual(self.hashdb['path/to/somefile'], expected)
 
     def test_update_path_throws_exception_for_non_existing_files(self):
         with FilesMock() as files:
-            files.add_file('/existent', 1, 1)
+            files.add_file('existent', 1, 1)
             with self.assertRaises(OSError) as cm:
-                self.hashdb.update_path('/nonexistent')
+                self.hashdb.update_path('nonexistent')
 
         self.assertEqual(cm.exception.errno, errno.ENOENT)
 
     def test_can_update_all_paths_in_tree(self):
         with patch('os.walk') as walk:
-            dirpath = '/dir'
+            dirpath = 'dir'
             walk.return_value = [
                 (dirpath, ['a', 'b'], ['file0', 'file1']),
                 (os.path.join(dirpath, 'a'), [], ['file2']),
@@ -240,7 +241,7 @@ class HashDbTest(unittest.TestCase):
 
     def test_update_all_prints_walk_errors_and_continues(self):
         with patch('os.walk') as walk:
-            dirpath = '/dir'
+            dirpath = 'dir'
 
             def test_error_handler(path, onerror):
                 with patch('sys.stderr') as stderr:
@@ -258,7 +259,7 @@ class HashDbTest(unittest.TestCase):
 
     def test_update_all_prints_update_path_errors_and_continues(self):
         with patch('os.walk') as walk:
-            dirpath = '/dir'
+            dirpath = 'dir'
             walk.return_value = [(dirpath, [], ['file'])]
             with patch('sys.stderr') as stderr:
                 buffer = StringIO()
@@ -274,32 +275,32 @@ class HashDbTest(unittest.TestCase):
 
     def test_strip_deletes_hashes_for_nonexistent_files(self):
         with FilesMock() as files:
-            files.add_file('/path/to/somefile', 123, 1024)
+            files.add_file('path/to/somefile', 123, 1024)
             self.hashdb.strip()
-        self.assertIn('/path/to/somefile', self.hashdb)
-        self.assertNotIn('/path/to/anotherfile', self.hashdb)
+        self.assertIn('path/to/somefile', self.hashdb)
+        self.assertNotIn('path/to/anotherfile', self.hashdb)
 
     def test_verify_tree(self):
-        self.data['/path/missingOnDisk'] = \
+        self.data['path/missingOnDisk'] = \
             '1366207797;1024;040f06fd774092478d450774f5ba30c5da78acc8'
         with patch('os.walk') as walk:
-            dirpath = '/path'
+            dirpath = 'path'
             walk.return_value = [
                 (dirpath, ['to'], ['missingInDb']),
                 (os.path.join(dirpath, 'to'), [], ['somefile']),
                 (os.path.join(dirpath, 'to'), [], ['anotherfile'])]
             with FilesMock() as files:
-                files.add_file('/path/to/somefile', 1, 1)
-                files.add_file('/path/to/anotherfile', 1, 1)
+                files.add_file('path/to/somefile', 1, 1)
+                files.add_file('path/to/anotherfile', 1, 1)
                 changed, missing_in_db, missing_on_disk = \
                     self.hashdb.verify_tree(dirpath)
-        self.assertEqual(changed, ['/path/to/somefile'])
-        self.assertEqual(missing_in_db, ['/path/missingInDb'])
-        self.assertEqual(missing_on_disk, ['/path/missingOnDisk'])
+        self.assertEqual(changed, ['path/to/somefile'])
+        self.assertEqual(missing_in_db, ['path/missingInDb'])
+        self.assertEqual(missing_on_disk, ['path/missingOnDisk'])
 
     def test_verify_tree_prints_walk_errors_and_continues(self):
         with patch('os.walk') as walk:
-            dirpath = '/dir'
+            dirpath = 'dir'
 
             def test_error_handler(path, onerror):
                 with patch('sys.stderr') as stderr:
@@ -317,7 +318,7 @@ class HashDbTest(unittest.TestCase):
 
     def test_verify_tree_prints_raised_errors_and_continues(self):
         with patch('os.walk') as walk:
-            dirpath = '/dir'
+            dirpath = 'dir'
             walk.return_value = [(dirpath, [], ['file'])]
             with patch('sys.stderr') as stderr:
                 buffer = StringIO()
