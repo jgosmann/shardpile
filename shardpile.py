@@ -189,4 +189,15 @@ if __name__ == '__main__':
             else:
                 db.update_tree(path)
         else:
-            db.verify_tree(path)
+            changed, missing_in_db, missing_on_disk = db.verify_tree(path)
+            print('Changed:')
+            for name in changed:
+                  print(name)
+            print('')
+            print('Missing in DB:')
+            for name in missing_in_db:
+                  print(name)
+            print('')
+            print('Missing on disk:')
+            for name in missing_on_disk:
+                  print(name)
