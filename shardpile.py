@@ -139,25 +139,27 @@ class HashDb(collections.MutableMapping):
             if not os.path.exists(key):
                 del self[key]
 
-    def verify_tree(self, path):
+    def verify_tree(self, dirpath):
         changed = []
         missing_in_db = []
         missing_on_disk = []
         for key, value in self.iteritems():
             try:
-                if not os.path.isfile(key):
+                path = os.path.join(dirpath, key)
+                if not os.path.isfile(path):
                     missing_on_disk.append(key)
-                elif value.sha1 != sha1sum(key):
+                elif value.sha1 != sha1sum(path):
                     changed.append(key)
             except Exception as e:
                 self.handle_error(e)
-        for dirpath, dirnames, filenames in os.walk(
-                path, onerror=self.handle_error):
+        for path, dirnames, filenames in os.walk(
+                dirpath, onerror=self.handle_error):
             for filename in filenames:
                 try:
-                    complete_path = os.path.join(dirpath, filename)
-                    if not complete_path in self:
-                        missing_in_db.append(complete_path)
+                    relpath = os.path.relpath(
+                        os.path.join(path, filename), dirpath)
+                    if not relpath in self:
+                        missing_in_db.append(relpath)
                 except Exception as e:
                     self.handle_error(e)
         return changed, missing_in_db, missing_on_disk

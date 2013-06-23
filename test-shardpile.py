@@ -23,6 +23,7 @@ class FilesMock(object):
 
     def __init__(self):
         self.files = {}
+        self.relpath = os.path.relpath
         self.path = patch('os.path')
         self.open = patch('__builtin__.open', mock_open(), create=True)
 
@@ -35,6 +36,7 @@ class FilesMock(object):
         os.path.getsize = MagicMock(side_effect=self.getsize)
         os.path.isfile = MagicMock(side_effect=self.isfile)
         os.path.join = MagicMock(side_effect=self.join)
+        os.path.relpath = self.relpath
         return self
 
     def __exit__(self, type, value, traceback):
@@ -282,22 +284,23 @@ class HashDbTest(unittest.TestCase):
         self.assertNotIn('path/to/anotherfile', self.hashdb)
 
     def test_verify_tree(self):
-        self.data['path/missingOnDisk'] = \
+        self.data['path/to/missingOnDisk'] = \
             '1366207797;1024;040f06fd774092478d450774f5ba30c5da78acc8'
         with patch('os.walk') as walk:
-            dirpath = 'path'
+            dirpath = 'dir'
             walk.return_value = [
-                (dirpath, ['to'], ['missingInDb']),
-                (os.path.join(dirpath, 'to'), [], ['somefile']),
-                (os.path.join(dirpath, 'to'), [], ['anotherfile'])]
+                (dirpath, ['path'], []),
+                (os.path.join(dirpath, 'path'), ['to'], ['missingInDb']),
+                (os.path.join(dirpath, 'path', 'to'), [], ['somefile']),
+                (os.path.join(dirpath, 'path', 'to'), [], ['anotherfile'])]
             with FilesMock() as files:
-                files.add_file('path/to/somefile', 1, 1)
-                files.add_file('path/to/anotherfile', 1, 1)
+                files.add_file('dir/path/to/somefile', 1, 1)
+                files.add_file('dir/path/to/anotherfile', 1, 1)
                 changed, missing_in_db, missing_on_disk = \
                     self.hashdb.verify_tree(dirpath)
         self.assertEqual(changed, ['path/to/somefile'])
         self.assertEqual(missing_in_db, ['path/missingInDb'])
-        self.assertEqual(missing_on_disk, ['path/missingOnDisk'])
+        self.assertEqual(missing_on_disk, ['path/to/missingOnDisk'])
 
     def test_verify_tree_prints_walk_errors_and_continues(self):
         with patch('os.walk') as walk:
@@ -329,9 +332,8 @@ class HashDbTest(unittest.TestCase):
                         errno.EPERM, 'Permission denied.', 'file')
                     self.hashdb.verify_tree(dirpath)
 
-                self.assertEqual(
-                    buffer.getvalue(),
-                    sys.argv[0] + ": file: Permission denied.\n")
+                self.assertTrue(buffer.getvalue().startswith(
+                    sys.argv[0] + ": file: Permission denied.\n"))
 
 
 class HashDbEntryTest(unittest.TestCase):
