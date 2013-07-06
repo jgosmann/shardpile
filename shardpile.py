@@ -172,7 +172,7 @@ if __name__ == '__main__':
         "tree in the file system and allows to verify trees against this " +
         "hash database.")
     parser.add_argument(
-        'path', nargs=1, type=str, help="Path to update hashes for.")
+        'paths', nargs='*', type=str, help="Paths to update hashes for.")
     parser.add_argument(
         '-d', '--database', nargs=1, type=str, default=['~/.shardpile.db'],
         help="Hash database to update.")
@@ -186,24 +186,30 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     with HashDb(os.path.expanduser(args.database[0])) as db:
-        path = args.path[0]
-        if args.update:
-            if not args.no_strip:
-                db.strip()
-            if os.path.isfile(path):
-                db.update_path(path)
+        if args.update and not args.no_strip:
+            db.strip()
+
+        for path in args.path[0]:
+            if args.update:
+                if os.path.isfile(path):
+                    db.update_path(path)
+                else:
+                    db.update_tree(path)
             else:
-                db.update_tree(path)
-        else:
-            changed, missing_in_db, missing_on_disk = db.verify_tree(path)
-            print('Changed:')
-            for name in changed:
-                print(name)
-            print('')
-            print('Missing in DB:')
-            for name in missing_in_db:
-                print(name)
-            print('')
-            print('Missing on disk:')
-            for name in missing_on_disk:
-                print(name)
+                print(path)
+                print(len(path) * '-')
+                print('')
+                changed, missing_in_db, missing_on_disk = db.verify_tree(path)
+                print('Changed:')
+                for name in changed:
+                    print(name)
+                print('')
+                print('Missing in DB:')
+                for name in missing_in_db:
+                    print(name)
+                print('')
+                print('Missing on disk:')
+                for name in missing_on_disk:
+                    print(name)
+                print('')
+                print('')
