@@ -189,7 +189,7 @@ if __name__ == '__main__':
         if args.update and not args.no_strip:
             db.strip()
 
-        for path in args.path[0]:
+        for path in args.paths:
             if args.update:
                 if os.path.isfile(path):
                     db.update_path(path)
