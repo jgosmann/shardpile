@@ -192,7 +192,7 @@ if __name__ == '__main__':
         for path in args.paths:
             if args.update:
                 if os.path.isfile(path):
-                    db.update_path(path, path)
+                    db.update_path('.', path)
                 else:
                     db.update_tree(path)
             else:
