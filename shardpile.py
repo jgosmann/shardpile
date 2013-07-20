@@ -5,6 +5,7 @@ import gdbm
 import hashlib
 import os
 import os.path
+import re
 
 
 def sha1sum(path):
@@ -119,18 +120,26 @@ class HashDb(collections.MutableMapping):
         sys.stderr.write(': '.join(msg))
         sys.stderr.write('\n')
 
-    def update_tree(self, path):
+    def update_tree(self, path, exclude=None):
         '''Updates the hash for all files below `path` in the file system tree.
         A hash is updated if the file size or modification time stored in the
         database do not match. A new entry will be created for files if no hash
         has been stored, yet.'''
+        if exclude is not None:
+            exclude_pattern = re.compile(exclude)
+        else:
+            exclude_pattern = None
+
         for dirpath, dirnames, filenames in os.walk(
                 path, onerror=self.handle_error):
             for filename in filenames:
                 try:
-                    self.update_path(
-                        path,
-                        os.path.relpath(os.path.join(dirpath, filename), path))
+                    path_to_file = os.path.relpath(
+                        os.path.join(dirpath, filename), path)
+                    do_update = exclude_pattern is None or \
+                        exclude_pattern.search(path_to_file) is None
+                    if do_update:
+                        self.update_path(path, path_to_file)
                 except Exception as e:
                     self.handle_error(e)
 
@@ -139,17 +148,25 @@ class HashDb(collections.MutableMapping):
             if not os.path.exists(key):
                 del self[key]
 
-    def verify_tree(self, dirpath):
+    def verify_tree(self, dirpath, exclude=None):
+        if exclude is not None:
+            exclude_pattern = re.compile(exclude)
+        else:
+            exclude_pattern = None
+
         changed = []
         missing_in_db = []
         missing_on_disk = []
         for key, value in self.iteritems():
             try:
                 path = os.path.join(dirpath, key)
-                if not os.path.isfile(path):
-                    missing_on_disk.append(key)
-                elif value.sha1 != sha1sum(path):
-                    changed.append(key)
+                verify = exclude_pattern is None or \
+                    exclude_pattern.search(path) is None
+                if verify:
+                    if not os.path.isfile(path):
+                        missing_on_disk.append(key)
+                    elif value.sha1 != sha1sum(path):
+                        changed.append(key)
             except Exception as e:
                 self.handle_error(e)
         for path, dirnames, filenames in os.walk(
@@ -158,7 +175,9 @@ class HashDb(collections.MutableMapping):
                 try:
                     relpath = os.path.relpath(
                         os.path.join(path, filename), dirpath)
-                    if not relpath in self:
+                    verify = exclude_pattern is None or \
+                        exclude_pattern.search(relpath) is None
+                    if verify and not relpath in self:
                         missing_in_db.append(relpath)
                 except Exception as e:
                     self.handle_error(e)
@@ -180,10 +199,17 @@ if __name__ == '__main__':
         '-u', '--update', action='store_true',
         help="Update the database instead of performing verification.")
     parser.add_argument(
+        '-x', '--exclude', nargs=1, type=str,
+        help='Files matching this regex will be omitted.')
+    parser.add_argument(
         '--no-strip', action='store_true',
         help="Do not strip hashes of deleted files from the database during " +
         "update.")
     args = parser.parse_args()
+
+    exclude = None
+    if args.exclude is not None:
+        exclude = args.exclude[0]
 
     with HashDb(os.path.expanduser(args.database[0])) as db:
         path = args.path[0]
@@ -193,9 +219,10 @@ if __name__ == '__main__':
             if os.path.isfile(path):
                 db.update_path(path)
             else:
-                db.update_tree(path)
+                db.update_tree(path, exclude)
         else:
-            changed, missing_in_db, missing_on_disk = db.verify_tree(path)
+            changed, missing_in_db, missing_on_disk = db.verify_tree(
+                path, exclude)
             print('Changed:')
             for name in changed:
                 print(name)

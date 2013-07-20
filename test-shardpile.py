@@ -242,6 +242,24 @@ class HashDbTest(unittest.TestCase):
                 for c in update_path.call_args_list:
                     self.assertIn(c, expected)
 
+    def test_can_exclude_patterns_in_update_tree(self):
+        with patch('os.walk') as walk:
+            dirpath = 'dir'
+            walk.return_value = [
+                (dirpath, ['a', 'b'], ['file0', 'exclude1']),
+                (os.path.join(dirpath, 'a'), [], ['exclude2']),
+                (os.path.join(dirpath, 'b'), [], ['file3', 'file4'])]
+            with patch.object(self.hashdb, 'update_path') as update_path:
+                self.hashdb.update_tree(dirpath, exclude=r'exclude\d')
+
+                expected = [call(dirpath, f) for f in [
+                    'file0', os.path.join('b', 'file3'),
+                    os.path.join('b', 'file4')]]
+                self.assertEqual(
+                    len(update_path.call_args_list), len(expected))
+                for c in update_path.call_args_list:
+                    self.assertIn(c, expected)
+
     def test_update_all_prints_walk_errors_and_continues(self):
         with patch('os.walk') as walk:
             dirpath = 'dir'
@@ -301,6 +319,26 @@ class HashDbTest(unittest.TestCase):
         self.assertEqual(changed, ['path/to/somefile'])
         self.assertEqual(missing_in_db, ['path/missingInDb'])
         self.assertEqual(missing_on_disk, ['path/to/missingOnDisk'])
+
+    def test_verify_tree_can_exclude_patterns(self):
+        self.data['path/to/exclude3'] = \
+            '1366207797;1024;040f06fd774092478d450774f5ba30c5da78acc8'
+        with patch('os.walk') as walk:
+            dirpath = 'dir'
+            walk.return_value = [
+                (dirpath, ['path'], []),
+                (os.path.join(dirpath, 'path'), ['to'], ['exclude1']),
+                (os.path.join(dirpath, 'path', 'to'), [], ['exclude2']),
+                (os.path.join(dirpath, 'path', 'to'), [], ['anotherfile'])]
+            with FilesMock() as files:
+                files.add_file('dir/path/to/exclude2', 1, 1)
+                files.add_file('dir/path/to/anotherfile', 1, 1)
+                changed, missing_in_db, missing_on_disk = \
+                    self.hashdb.verify_tree(
+                        dirpath, exclude=r'exclude\d|somefile')
+        self.assertEqual(changed, [])
+        self.assertEqual(missing_in_db, [])
+        self.assertEqual(missing_on_disk, [])
 
     def test_verify_tree_prints_walk_errors_and_continues(self):
         with patch('os.walk') as walk:
